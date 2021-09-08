@@ -1,0 +1,20 @@
+<template>
+    <lightning-card>  
+        <div class = "slds-m-around_medium">  
+            <lightning-input type = "search" onchange = {handleKeyChange} class = "slds-m-bottom_small" label = "Search" >  
+            </lightning-input>  
+            <template if:true={todos}></template>
+                <div style="height: 300px;">  
+                    <lightning-datatable key-field="id"  
+                                         data={todos}  
+                                         columns={columns}   
+                                         hide-checkbox-column="true"  
+                                         onrowaction={callRowAction}>  
+                    </lightning-datatable>  
+                </div>  
+            <template if:true = {error}>  
+                {error}>           
+            </template>  
+        </div> 
+    </lightning-card>
+    </template>
