@@ -1,15 +1,13 @@
 import {LightningElement, track, wire} from 'lwc';
-import TODO_Object from '@salesforce/schema/Todo__c';
-import TODO_NAME from '@salesforce/schema/Todo__c.Name';
-import TODO_DESCRIPTION from '@salesforce/schema/Todo__c.Description__c';
-import TODO_DEADLINE_DATE from '@salesforce/schema/Todo__c.Deadline_date__c';
-import TODO_PRIORITY from '@salesforce/schema/Todo__c.Priority__c';
-import TODO_STATUS from '@salesforce/schema/TODO__C.Status__c';
+import SUB_TODO_Object from '@salesforce/schema/Sub_Todo__c';
+import SUB_TODO_NAME from '@salesforce/schema/Sub_Todo__c.Name';
+import SUB_TODO_DESCRIPTION from '@salesforce/schema/Sub_Todo__c.Description__c';
+import SUB_TODO_STATUS from '@salesforce/schema/Sub_Todo__c.Status__c';
 
 // importing apex class methods
-import getTodoList from '@salesforce/apex/TodoListController.getTodoList';
-import fetchTodos from '@salesforce/apex/TodoListController.fetchTodos'; 
-import delSelectedTodos from '@salesforce/apex/TodoListController.deleteTodos';
+import getSubTodoList from '@salesforce/apex/SubTodoListController.getSubTodoList';
+import fetchSubTodos from '@salesforce/apex/SubTodoListController.fetchSubTodos'; 
+import delSelectedSubTodos from '@salesforce/apex/SubTodoListController.deleteSubTodos';
 
 
 // importing to show toast notifictions
@@ -27,11 +25,9 @@ const actions = [
 
 // datatable columns with row actions
 const columns = [
-    { label: 'Name', fieldName: TODO_NAME.fieldApiName }, 
-    { label: 'Description', fieldName: TODO_DESCRIPTION.fieldApiName, type: 'text'},
-    { label: 'Status', fieldName: TODO_STATUS.fieldApiName, type: 'picklist'}, 
-    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist' }, 
-    {label: 'Deadline Date' , fieldName: TODO_DEADLINE_DATE.fieldApiName, type:'date'},
+    { label: 'Name', fieldName: SUB_TODO_NAME.fieldApiName }, 
+    { label: 'Description', fieldName: SUB_TODO_DESCRIPTION.fieldApiName, type: 'text'},
+    { label: 'Status', fieldName: SUB_TODO_STATUS.fieldApiName, type: 'picklist'}, 
     {
         type: 'action',
         typeAttributes: {
@@ -40,9 +36,9 @@ const columns = [
         }
     }
 ];
-export default class TodoList extends LightningElement {
-    // reactive variable
-    @track todos;
+
+export default class SubTodo extends LightningElement {
+    @track subTodos;
     @track data;
     @track columns = columns;
     @track record = [];
@@ -51,19 +47,16 @@ export default class TodoList extends LightningElement {
     @track isEditForm = false;
     @track showLoadingSpinner = false;
     @track error;
-    // non-reactive variables
-    todoName = TODO_NAME;
-    todoDescription = TODO_DESCRIPTION;
-    todoDeadlineDate = TODO_DEADLINE_DATE;
-    todoPriority = TODO_PRIORITY;
-    todoStatus = TODO_STATUS;
+
+    objectApiName = SUB_TODO_Object;
+    openModal = false;
+
+    subTodoName = SUB_TODO_NAME;
+    subTodoDescription = SUB_TODO_DESCRIPTION;
+    subTodoStatus = SUB_TODO_STATUS;
     selectedRecords = [];
     refreshTable;
     searchValue = '';
-    
-    objectApiName = TODO_Object;
-    openModal = false;
-    
 
     showModal(){
         this.openModal=true;
@@ -83,11 +76,9 @@ export default class TodoList extends LightningElement {
            return refreshApex(this.refreshTable);
        }
    }
-    // retrieving the data using wire service
-    @wire(getTodoList)
-    todos(result) {
+   @wire(getSubTodoList)
+    subTodos(result) {
         this.refreshTable = result;
-        console.log(result," getTodosList");
         if (result.data) {
             this.data = result.data;
             this.error = undefined;
@@ -97,30 +88,28 @@ export default class TodoList extends LightningElement {
             this.data = undefined;
         }
     }
-   handleKeyChange( event ) {  
- /*   
-               
+    handleKeyChange( event ) {  
+            
         const searchKey = event.target.value;  
-        console.log("handleKeyChange searchKey [",searchKey, "]" );
-
+  
         if ( searchKey ) {  
   
-            fetchTodos( { searchKey } )    
+            fetchSubTodos( { searchKey } )    
             .then(result => {  
   
-                this.todos = result;  
-                console.log("result", result);
+                this.subTodos = result;  
   
             })  
             .catch(error => {  
   
                 this.error = error;  
-  console.log("error", error);
+  
             });  
   
-        }  */
+        } else  
+        this.subTodos = undefined;  
+  
     }      
-
     handleRowActions(event) {
         let actionName = event.detail.action.name;
 
@@ -138,13 +127,12 @@ export default class TodoList extends LightningElement {
                 this.editCurrentRecord(row);
                 break;
             case 'delete':
-                this.deleteTodos(row);
+                this.deleteSubTodo(row);
                 break;
         }
     }
-
-    // view the current record details
-    viewCurrentRecord(currentRow) {
+     // view the current record details
+     viewCurrentRecord(currentRow) {
         this.bShowModal = true;
         this.isEditForm = false;
         this.record = currentRow;
@@ -179,7 +167,7 @@ export default class TodoList extends LightningElement {
         // showing success message
         this.dispatchEvent(new ShowToastEvent({
             title: 'Success!!',
-            message:' Todo updated Successfully!!.',
+            message:' Sub Todo updated Successfully!!.',
             variant: 'success'
         }),);
 
@@ -190,13 +178,13 @@ export default class TodoList extends LightningElement {
         return refreshApex(this.refreshTable);
     }
 
-    deleteTodos(currentRow) {
+    deleteSubTodo(currentRow) {
         let currentRecord = [];
         currentRecord.push(currentRow.Id);
         this.showLoadingSpinner = true;
 
         // calling apex class method to delete the selected contact
-        delSelectedTodos({lstTodoIds: currentRecord})
+        delSelectedSubTodos({lstSubTodoIds: currentRecord})
         .then(result => {
             window.console.log('result ====> ' + result);
             this.showLoadingSpinner = false;
@@ -221,5 +209,6 @@ export default class TodoList extends LightningElement {
             }),);
         });
     }
+
 
 }
