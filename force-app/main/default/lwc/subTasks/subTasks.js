@@ -1,13 +1,12 @@
 import {LightningElement, track, wire} from 'lwc';
-import SUB_TODO_Object from '@salesforce/schema/Sub_Todo__c';
-import SUB_TODO_NAME from '@salesforce/schema/Sub_Todo__c.Name';
-import SUB_TODO_DESCRIPTION from '@salesforce/schema/Sub_Todo__c.Description__c';
-import SUB_TODO_STATUS from '@salesforce/schema/Sub_Todo__c.Status__c';
+import SUB_TODO_Object from '@salesforce/schema/Activity';
+import SUB_TODO_NAME from '@salesforce/schema/Activity.Name__c';
+import SUB_TODO_DESCRIPTION from '@salesforce/schema/Activity.Description__c';
+import SUB_TODO_STATUS from '@salesforce/schema/Activity.Status__c';
 
 // importing apex class methods
-import getSubTodoList from '@salesforce/apex/SubTodoListController.getSubTodoList';
-import fetchSubTodos from '@salesforce/apex/SubTodoListController.fetchSubTodos'; 
-import delSelectedSubTodos from '@salesforce/apex/SubTodoListController.deleteSubTodos';
+import getSubTask from '@salesforce/apex/SubTodoListController.getSubTask'; 
+import delSelectedSubTasks from '@salesforce/apex/SubTodoListController.deleteSubTasks';
 
 
 // importing to show toast notifictions
@@ -18,8 +17,6 @@ import {refreshApex} from '@salesforce/apex';
 
 // row actions
 const actions = [
-    { label: 'Record Details', name: 'record_details'}, 
-    { label: 'Edit', name: 'edit'}, 
     { label: 'Delete', name: 'delete'}
 ];
 
@@ -38,7 +35,7 @@ const columns = [
 ];
 
 export default class SubTodo extends LightningElement {
-    @track subTodos;
+    @track subTasks;
     @track data;
     @track columns = columns;
     @track record = [];
@@ -56,7 +53,6 @@ export default class SubTodo extends LightningElement {
     subTodoStatus = SUB_TODO_STATUS;
     selectedRecords = [];
     refreshTable;
-    searchValue = '';
 
     showModal(){
         this.openModal=true;
@@ -76,8 +72,8 @@ export default class SubTodo extends LightningElement {
            return refreshApex(this.refreshTable);
        }
    }
-   @wire(getSubTodoList)
-    subTodos(result) {
+   @wire(getSubTask)
+    subTasks(result) {
         this.refreshTable = result;
         if (result.data) {
             this.data = result.data;
@@ -87,29 +83,7 @@ export default class SubTodo extends LightningElement {
             this.error = result.error;
             this.data = undefined;
         }
-    }
-    handleKeyChange( event ) {  
-            
-        const searchKey = event.target.value;  
-  
-        if ( searchKey ) {  
-  
-            fetchSubTodos( { searchKey } )    
-            .then(result => {  
-  
-                this.subTodos = result;  
-  
-            })  
-            .catch(error => {  
-  
-                this.error = error;  
-  
-            });  
-  
-        } else  
-        this.subTodos = undefined;  
-  
-    }      
+    }     
     handleRowActions(event) {
         let actionName = event.detail.action.name;
 
@@ -127,7 +101,7 @@ export default class SubTodo extends LightningElement {
                 this.editCurrentRecord(row);
                 break;
             case 'delete':
-                this.deleteSubTodo(row);
+                this.deleteSubTask(row);
                 break;
         }
     }
@@ -178,13 +152,13 @@ export default class SubTodo extends LightningElement {
         return refreshApex(this.refreshTable);
     }
 
-    deleteSubTodo(currentRow) {
+    deleteSubTask(currentRow) {
         let currentRecord = [];
         currentRecord.push(currentRow.Id);
         this.showLoadingSpinner = true;
 
         // calling apex class method to delete the selected contact
-        delSelectedSubTodos({lstSubTodoIds: currentRecord})
+        delSelectedSubTasks({lstSubTaskIds: currentRecord})
         .then(result => {
             window.console.log('result ====> ' + result);
             this.showLoadingSpinner = false;
@@ -192,7 +166,7 @@ export default class SubTodo extends LightningElement {
             // showing success message
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Success!!',
-                message:' Todo deleted.',
+                message:' Sub Todo deleted.',
                 variant: 'success'
             }),);
 

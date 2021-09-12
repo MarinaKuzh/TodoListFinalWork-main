@@ -1,15 +1,15 @@
 import {LightningElement, track, wire} from 'lwc';
-import TODO_Object from '@salesforce/schema/Todo__c';
-import TODO_NAME from '@salesforce/schema/Todo__c.Name';
-import TODO_DESCRIPTION from '@salesforce/schema/Todo__c.Description__c';
-import TODO_DEADLINE_DATE from '@salesforce/schema/Todo__c.Deadline_date__c';
-import TODO_PRIORITY from '@salesforce/schema/Todo__c.Priority__c';
-import TODO_STATUS from '@salesforce/schema/TODO__C.Status__c';
+import TODO_Object from '@salesforce/schema/Task';
+import TODO_NAME from '@salesforce/schema/Task.Subject';
+import TODO_DESCRIPTION from '@salesforce/schema/Task.Description';
+import TODO_DUE_DATE from '@salesforce/schema/Task.ActivityDate';
+import TODO_PRIORITY from '@salesforce/schema/Task.Priority';
+import TODO_STATUS from '@salesforce/schema/Task.Status';
 
 // importing apex class methods
-import getTodoList from '@salesforce/apex/TodoListController.getTodoList';
-import fetchTodos from '@salesforce/apex/TodoListController.fetchTodos'; 
-import delSelectedTodos from '@salesforce/apex/TodoListController.deleteTodos';
+import getTasks from '@salesforce/apex/TodoListController.getTasks';
+import fetchTasks from '@salesforce/apex/TodoListController.fetchTasks'; 
+import delSelectedTasks from '@salesforce/apex/TodoListController.deleteTasks';
 
 
 // importing to show toast notifictions
@@ -31,7 +31,7 @@ const columns = [
     { label: 'Description', fieldName: TODO_DESCRIPTION.fieldApiName, type: 'text'},
     { label: 'Status', fieldName: TODO_STATUS.fieldApiName, type: 'picklist'}, 
     { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist' }, 
-    {label: 'Deadline Date' , fieldName: TODO_DEADLINE_DATE.fieldApiName, type:'date'},
+    {label: 'Due Date' , fieldName: TODO_DUE_DATE.fieldApiName, type:'date'},
     {
         type: 'action',
         typeAttributes: {
@@ -54,7 +54,7 @@ export default class TodoList extends LightningElement {
     // non-reactive variables
     todoName = TODO_NAME;
     todoDescription = TODO_DESCRIPTION;
-    todoDeadlineDate = TODO_DEADLINE_DATE;
+    todoDueDate = TODO_DUE_DATE;
     todoPriority = TODO_PRIORITY;
     todoStatus = TODO_STATUS;
     selectedRecords = [];
@@ -84,10 +84,10 @@ export default class TodoList extends LightningElement {
        }
    }
     // retrieving the data using wire service
-    @wire(getTodoList)
-    todos(result) {
+    @wire(getTasks)
+    tasks(result) {
         this.refreshTable = result;
-        console.log(result," getTodosList");
+      
         if (result.data) {
             this.data = result.data;
             this.error = undefined;
@@ -98,27 +98,27 @@ export default class TodoList extends LightningElement {
         }
     }
    handleKeyChange( event ) {  
- /*   
+    
                
         const searchKey = event.target.value;  
-        console.log("handleKeyChange searchKey [",searchKey, "]" );
+
 
         if ( searchKey ) {  
   
-            fetchTodos( { searchKey } )    
+            fetchTasks( { searchKey } )    
             .then(result => {  
   
-                this.todos = result;  
-                console.log("result", result);
+                this.tasks = result;  
+              
   
             })  
             .catch(error => {  
   
                 this.error = error;  
-  console.log("error", error);
+
             });  
   
-        }  */
+        }  
     }      
 
     handleRowActions(event) {
@@ -138,7 +138,7 @@ export default class TodoList extends LightningElement {
                 this.editCurrentRecord(row);
                 break;
             case 'delete':
-                this.deleteTodos(row);
+                this.deleteTasks(row);
                 break;
         }
     }
@@ -190,13 +190,13 @@ export default class TodoList extends LightningElement {
         return refreshApex(this.refreshTable);
     }
 
-    deleteTodos(currentRow) {
+    deleteTasks(currentRow) {
         let currentRecord = [];
         currentRecord.push(currentRow.Id);
         this.showLoadingSpinner = true;
 
-        // calling apex class method to delete the selected contact
-        delSelectedTodos({lstTodoIds: currentRecord})
+        // calling apex class method to delete the selected todo
+        delSelectedTasks({lstTaskIds: currentRecord})
         .then(result => {
             window.console.log('result ====> ' + result);
             this.showLoadingSpinner = false;
