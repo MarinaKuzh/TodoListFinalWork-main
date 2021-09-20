@@ -1,91 +1,115 @@
-import {LightningElement, track, wire} from 'lwc';
-import TODO_Object from '@salesforce/schema/Task';
-import TODO_NAME from '@salesforce/schema/Task.Subject';
-import TODO_DESCRIPTION from '@salesforce/schema/Task.Description';
-import TODO_DUE_DATE from '@salesforce/schema/Task.ActivityDate';
-import TODO_PRIORITY from '@salesforce/schema/Task.Priority';
-import TODO_STATUS from '@salesforce/schema/Task.Status';
+import {LightningElement, track, wire, api} from 'lwc';
+import TODO_Object from '@salesforce/schema/Todo__c';
+import TODO_NAME from '@salesforce/schema/Todo__c.Name';
+import TODO_DESCRIPTION from '@salesforce/schema/Todo__c.Description__c';
+import TODO_DUE_DATE from '@salesforce/schema/Todo__c.Due_Date__c';
+import TODO_PRIORITY from '@salesforce/schema/Todo__c.Priority__c';
+import TODO_CATEGORY from '@salesforce/schema/Todo__c.Category__c';
+import TODO_STATUS from '@salesforce/schema/Todo__c.Status__c';
+import TODO_RECORD_TYPE from '@salesforce/schema/Todo__c.RecordType.Name'
+import { NavigationMixin } from 'lightning/navigation';
 
 // importing apex class methods
-import getTasks from '@salesforce/apex/TodoListController.getTasks';
-import fetchTasks from '@salesforce/apex/TodoListController.fetchTasks'; 
-import delSelectedTasks from '@salesforce/apex/TodoListController.deleteTasks';
+import getTodos from '@salesforce/apex/TodoListController.getTodos';
+import deleteTodo from '@salesforce/apex/TodoListController.deleteTodo';
 
-
-// importing to show toast notifictions
-import {ShowToastEvent} from 'lightning/platformShowToastEvent';
 
 // importing to refresh the apex if any record changes the datas
 import {refreshApex} from '@salesforce/apex';
 
-// row actions
-const actions = [
-    { label: 'Record Details', name: 'record_details'}, 
+const actions= [
     { label: 'Edit', name: 'edit'}, 
     { label: 'Delete', name: 'delete'}
-];
-
-// datatable columns with row actions
-const columns = [
+]
+const  columns = [
     { label: 'Name', fieldName: TODO_NAME.fieldApiName }, 
     { label: 'Description', fieldName: TODO_DESCRIPTION.fieldApiName, type: 'text'},
-    { label: 'Status', fieldName: TODO_STATUS.fieldApiName, type: 'picklist'}, 
-    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist' }, 
-    {label: 'Due Date' , fieldName: TODO_DUE_DATE.fieldApiName, type:'date'},
-    {
-        type: 'action',
-        typeAttributes: {
-            rowActions: actions,
-            menuAlignment: 'right'
-        }
-    }
+    { label: 'Due Date', fieldName: TODO_DUE_DATE.fieldApiName, type: 'date'}, 
+    { label: 'Status', fieldName: TODO_STATUS.fieldApiName,type: 'picklist'}, 
+    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist'},
+    { label: 'Category', fieldName: 'Category__c', type: 'picklist'},
+    { label: 'Record Type' , fieldName: 'RecordType.Name', actions:[
+        { label: 'All', checked: true, name:'all' },
+        { label: 'Season', checked: false, name:'Season' },
+        { label: 'Position', checked: false, name:'Position' }
+    ]}, 
+    {type: "button",  initialWidth: 80, typeAttributes: {  
+        label: 'Edit',  
+        name: 'Edit',  
+        title: 'Edit',  
+        disabled: false,  
+        value: 'edit',   
+        iconPosition: 'center'  
+    }}  ,
+    {type: "button", initialWidth: 80, typeAttributes: {  
+        label: 'Delete',  
+        name: 'Delete',  
+        title: 'Delete',  
+        disabled: false,  
+        value: 'delete',  
+        iconPosition: 'center'  
+    }}  
 ];
-export default class TodoList extends LightningElement {
+
+export default class TodoList extends NavigationMixin (LightningElement) {
+   
+    
+    @api recordId;
+    @api sortedDirection = 'asc';
+    @api sortedBy = 'Name';
+    @api searchKey = '';
+    result;
     // reactive variable
-    @track todos;
+    @track todo;
     @track data;
     @track columns = columns;
     @track record = [];
-    @track bShowModal = false;
     @track currentRecordId;
-    @track isEditForm = false;
     @track showLoadingSpinner = false;
     @track error;
+    @track selectedRows;
+    @track deleteSelectedButtonDisabled = true;
+
     // non-reactive variables
+    objectApiName = TODO_Object;
+
     todoName = TODO_NAME;
     todoDescription = TODO_DESCRIPTION;
     todoDueDate = TODO_DUE_DATE;
     todoPriority = TODO_PRIORITY;
     todoStatus = TODO_STATUS;
+    todoCategory = TODO_CATEGORY;
+    todoRecordType= TODO_RECORD_TYPE;
     selectedRecords = [];
     refreshTable;
-    searchValue = '';
+    todos=[];
     
-    objectApiName = TODO_Object;
-    openModal = false;
     
 
-    showModal(){
-        this.openModal=true;
-    }
-    closeModalCreate(){
-        this.openModal=false;
-    }
+       // flas
+    showTable = false;
+    
+    navigateToNewTodo() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__objectPage',
+            attributes: {
+              objectApiName: 'Todo__c',
+              actionName: 'new'
+            },
+            state: {
+              useRecordTypeCheck: 1
+            }
+          });
+      
+           return refreshApex(this.refreshTable);   
+       }   
 
-   handleSuccessModal(){
-       if(this.recordId!==null){
-           this.openModal = false;
-           this.dispatchEvent(new ShowToastEvent({
-               title: "Success" ,
-               message: "New record has been created." ,
-               variant: "success",
-           }),);
-           return refreshApex(this.refreshTable);
-       }
-   }
+   
     // retrieving the data using wire service
-    @wire(getTasks)
-    tasks(result) {
+    @wire(getTodos, {searchKey: '$searchKey', 
+                     sortBy: '$sortedBy', 
+                     sortDirection: '$sortedDirection'})
+    todos(result) {
         this.refreshTable = result;
       
         if (result.data) {
@@ -95,131 +119,110 @@ export default class TodoList extends LightningElement {
         } else if (result.error) {
             this.error = result.error;
             this.data = undefined;
-        }
-    }
-   handleKeyChange( event ) {  
+    }}
+
+
+    handleHeaderAction (event) {
+        // Retrieves the name of the selected filter
+        const actionName = event.detail.action.name;
+        // Retrieves the current column definition
+        // based on the selected filter
+        const colDef = event.detail.columnDefinition;
+        const columns = this.columns;
+        const activeFilter = this.activeFilter;
     
-               
-        const searchKey = event.target.value;  
-
-
-        if ( searchKey ) {  
-  
-            fetchTasks( { searchKey } )    
-            .then(result => {  
-  
-                this.tasks = result;  
-              
-  
-            })  
-            .catch(error => {  
-  
-                this.error = error;  
-
-            });  
-  
-        }  
-    }      
-
-    handleRowActions(event) {
-        let actionName = event.detail.action.name;
-
-        window.console.log('actionName ====> ' + actionName);
-
-        let row = event.detail.row;
-
-        window.console.log('row ====> ' + row);
-        // eslint-disable-next-line default-case
-        switch (actionName) {
-            case 'record_details':
-                this.viewCurrentRecord(row);
-                break;
-            case 'edit':
-                this.editCurrentRecord(row);
-                break;
-            case 'delete':
-                this.deleteTasks(row);
-                break;
+        if (actionName !== activeFilter) {
+            var idx = columns.indexOf(colDef);
+            // Update the column definition with the updated actions data
+            var actions = columns[idx].actions;
+            actions.forEach((action) => {
+                action.checked = action.name === actionName;
+            });
+            this.activeFilter = actionName;
+            this.updateTodos();
+            this.columns = columns;
+        }}
+    
+    updateTodos(cmp) {
+        const rows = this.rawData;
+        const activeFilter = this.activeFilter;
+        const filteredRows = rows;
+        if (activeFilter !== 'all') {
+            filteredRows = rows.filter(function (row) {
+                return (activeFilter === 'season' ||
+                  activeFilter === 'position');
+                });
         }
+        this.data = filteredRows;
     }
 
-    // view the current record details
-    viewCurrentRecord(currentRow) {
-        this.bShowModal = true;
-        this.isEditForm = false;
-        this.record = currentRow;
+      
+    sortColumns( event ) {
+        this.sortedBy = event.detail.fieldName;
+        this.sortedDirection = event.detail.sortDirection;
+        return refreshApex(this.result);
+        
     }
-
-    // closing modal box
-    closeModal() {
-        this.bShowModal = false;
-    }
-
-
-    editCurrentRecord(currentRow) {
-        // open modal box
-        this.bShowModal = true;
-        this.isEditForm = true;
-
-        // assign record id to the record edit form
-        this.currentRecordId = currentRow.Id;
-    }
-
-    // handleing record edit form submit
-    handleSubmit(event) {
-        // prevending default type sumbit of record edit form
-        event.preventDefault();
-
-        // querying the record edit form and submiting fields to form
-        this.template.querySelector('lightning-record-edit-form').submit(event.detail.fields);
-
-        // closing modal
-        this.bShowModal = false;
-
-        // showing success message
-        this.dispatchEvent(new ShowToastEvent({
-            title: 'Success!!',
-            message:' Todo updated Successfully!!.',
-            variant: 'success'
-        }),);
-
-    }
-
-    // refreshing the datatable after record edit form success
-    handleSuccess() {
+  
+    handleSearchKeyChange( event ) {
+        this.searchKey = event.target.value;
+        return refreshApex(this.result);
+    }    
+    
+    callRowAction( event ) {  
+          
+        const recId =  event.detail.row.Id;  
+        const actionName = event.detail.action.name;  
+        if ( actionName === 'Edit' ) {  
+  
+            this[NavigationMixin.Navigate]({  
+                type: 'standard__recordPage',  
+                attributes: {  
+                    recordId: event.detail.row.Id,  
+                    objectApiName: 'Todo__c',  
+                    actionName: 'edit'  
+                }  
+            })  
+            return refreshApex(this.refreshTable);
+  
+        } else if ( actionName === 'Delete') {  
+            var idList = [];
+            const recId =  event.detail.row.Id; 
+            idList.push(recId);
+            this.deleteRecords(idList);
+        }
         return refreshApex(this.refreshTable);
     }
 
-    deleteTasks(currentRow) {
-        let currentRecord = [];
-        currentRecord.push(currentRow.Id);
-        this.showLoadingSpinner = true;
 
-        // calling apex class method to delete the selected todo
-        delSelectedTasks({lstTaskIds: currentRecord})
-        .then(result => {
-            window.console.log('result ====> ' + result);
-            this.showLoadingSpinner = false;
+        deleteRecords(idList){
+            console.log('To Be Deleted:'+JSON.stringify(idList));
+            deleteTodo({idList: idList})
+                .then(result => {
+                    console.log('Deleted');
+                    this.handleSearch();
+                });
+                return refreshApex(this.refreshTable);
+        }
+        handleRowSelection(event){
+        
+            const selectedRows = event.detail.selectedRows;
+            console.log('Selected Rows: '+JSON.stringify(selectedRows));
+            this.selectedRows = selectedRows;
+            if(this.selectedRows != undefined && this.selectedRows.length>0){
+                this.deleteSelectedButtonDisabled = false;
+            }
+            else{
+                this.deleteSelectedButtonDisabled = true;
+            }
+        }
+        deleteSelectedTodos(event){
+            var idList = [];
+            var selectedRows = this.selectedRows;
+            for(var x in selectedRows){
+                idList.push(selectedRows[x].Id);
+            }
+            this.deleteRecords(idList);
+        }
 
-            // showing success message
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Success!!',
-                message:' Todo deleted.',
-                variant: 'success'
-            }),);
-
-            // refreshing table data using refresh apex
-             return refreshApex(this.refreshTable);
-
-        })
-        .catch(error => {
-            window.console.log('Error ====> '+error);
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error!!', 
-                message: error.message, 
-                variant: 'error'
-            }),);
-        });
     }
-
-}

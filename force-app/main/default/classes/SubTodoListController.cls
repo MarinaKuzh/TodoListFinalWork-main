@@ -1,26 +1,22 @@
 public with sharing class SubTodoListController {
 
     @AuraEnabled(Cacheable = true)
-    public static List<Activity> getSubTask(){
-        return [SELECT Name__c, Description__c, Status__c FROM Activity ORDER BY Name limit 10];
+    public static List<Sub_Task__c> getSubTask(){
+        return [SELECT Name, Description__c, Status__c FROM Sub_Task__c ORDER BY Name];
     }
   
 
     @AuraEnabled
-    public static void deleteSubTasks (List<Id> lstSubTaskIds){
-        try {
-            List<Activity> lstSubTaskToDelete = new List<Activity>();
-            System.debug('lstSubTaskIds ====> '+lstSubTaskIds);
-            for(Id idSubTask : lstSubTaskIds) {
-                lstSubTaskToDelete.add(new Activity(Id = idSubTask));
+        public static void deleteSubTasks (List<Id> idList){
+            List<Sub_Task__c> subTaskList = new List<Sub_Task__c>();
+            for(Id id : idList){
+                subTaskList.add(new Sub_Task__c(Id = id));
             }
-            if(!lstSubTaskToDelete.isEmpty()) {
-                delete lstSubTaskToDelete;
+    
+    
+            if(!subTaskList.isEmpty()){
+                delete subTaskList;
             }
         }
-        catch(Exception ex) {
-            throw new AuraHandledException(ex.getMessage());
-        }
-    }
 
 }

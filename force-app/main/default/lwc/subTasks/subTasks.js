@@ -1,22 +1,21 @@
-import {LightningElement, track, wire} from 'lwc';
-import SUB_TODO_Object from '@salesforce/schema/Activity';
-import SUB_TODO_NAME from '@salesforce/schema/Activity.Name__c';
-import SUB_TODO_DESCRIPTION from '@salesforce/schema/Activity.Description__c';
-import SUB_TODO_STATUS from '@salesforce/schema/Activity.Status__c';
+import {LightningElement, track, wire,api} from 'lwc';
+import SUB_TODO_Object from '@salesforce/schema/Sub_Task__c';
+import SUB_TODO_NAME from '@salesforce/schema/Sub_Task__c.Name';
+import SUB_TODO_DESCRIPTION from '@salesforce/schema/Sub_Task__c.Description__c';
+import SUB_TODO_STATUS from '@salesforce/schema/Sub_Task__c.Status__c';
+import { NavigationMixin } from 'lightning/navigation';
 
 // importing apex class methods
 import getSubTask from '@salesforce/apex/SubTodoListController.getSubTask'; 
-import delSelectedSubTasks from '@salesforce/apex/SubTodoListController.deleteSubTasks';
+import deleteSubTasks from '@salesforce/apex/SubTodoListController.deleteSubTasks';
 
-
-// importing to show toast notifictions
-import {ShowToastEvent} from 'lightning/platformShowToastEvent';
 
 // importing to refresh the apex if any record changes the datas
 import {refreshApex} from '@salesforce/apex';
 
 // row actions
 const actions = [
+    { label: 'Edit', name: 'edit'}, 
     { label: 'Delete', name: 'delete'}
 ];
 
@@ -24,18 +23,33 @@ const actions = [
 const columns = [
     { label: 'Name', fieldName: SUB_TODO_NAME.fieldApiName }, 
     { label: 'Description', fieldName: SUB_TODO_DESCRIPTION.fieldApiName, type: 'text'},
-    { label: 'Status', fieldName: SUB_TODO_STATUS.fieldApiName, type: 'picklist'}, 
-    {
-        type: 'action',
-        typeAttributes: {
-            rowActions: actions,
-            menuAlignment: 'right'
-        }
-    }
+    { label: 'Status', fieldName: SUB_TODO_STATUS.fieldApiName, type: 'picklist',actions: [
+        { label: 'All', checked: true, name:'all' },
+        { label: 'Not Started', checked: false, name:'not Started' },
+        { label: 'In Progress', checked: false, name:'in Progress' },
+        { label: 'Completed', checked: false, name:'completed' }
+     ]},
+     {type: "button",  initialWidth: 80, typeAttributes: {  
+        label: 'Edit',  
+        name: 'Edit',  
+        title: 'Edit',  
+        disabled: false,  
+        value: 'edit',   
+        iconPosition: 'center'  
+    }}  ,
+    {type: "button", initialWidth: 80, typeAttributes: {  
+        label: 'Delete',  
+        name: 'Delete',  
+        title: 'Delete',  
+        disabled: false,  
+        value: 'delete',  
+        iconPosition: 'center'  
+    }}  
 ];
 
-export default class SubTodo extends LightningElement {
-    @track subTasks;
+export default class SubTodo extends NavigationMixin (LightningElement) {
+    @api recordId;
+    @track subTask;
     @track data;
     @track columns = columns;
     @track record = [];
@@ -44,6 +58,7 @@ export default class SubTodo extends LightningElement {
     @track isEditForm = false;
     @track showLoadingSpinner = false;
     @track error;
+    @track deleteSelectedButtonDisabled = true;
 
     objectApiName = SUB_TODO_Object;
     openModal = false;
@@ -54,24 +69,21 @@ export default class SubTodo extends LightningElement {
     selectedRecords = [];
     refreshTable;
 
-    showModal(){
-        this.openModal=true;
-    }
-    closeModalCreate(){
-        this.openModal=false;
-    }
+    navigateToNewSubTodo() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__objectPage',
+            attributes: {
+              objectApiName: 'Sub_Task__c',
+              actionName: 'new'
+            },
+            state: {
+              useRecordTypeCheck: 1
+            }
+          });
+      
+           return refreshApex(this.refreshTable);   
+       }   
 
-   handleSuccessModal(){
-       if(this.recordId!==null){
-           this.openModal = false;
-           this.dispatchEvent(new ShowToastEvent({
-               title: "Success" ,
-               message: "New record has been created." ,
-               variant: "success",
-           }),);
-           return refreshApex(this.refreshTable);
-       }
-   }
    @wire(getSubTask)
     subTasks(result) {
         this.refreshTable = result;
@@ -85,104 +97,53 @@ export default class SubTodo extends LightningElement {
         }
     }     
     handleRowActions(event) {
-        let actionName = event.detail.action.name;
-
-        window.console.log('actionName ====> ' + actionName);
-
-        let row = event.detail.row;
-
-        window.console.log('row ====> ' + row);
-        // eslint-disable-next-line default-case
-        switch (actionName) {
-            case 'record_details':
-                this.viewCurrentRecord(row);
-                break;
-            case 'edit':
-                this.editCurrentRecord(row);
-                break;
-            case 'delete':
-                this.deleteSubTask(row);
-                break;
+        const recId =  event.detail.row.Id;  
+        const actionName = event.detail.action.name;  
+        if ( actionName === 'Edit' ) {  
+            this[NavigationMixin.Navigate]({
+                type: "standard__recordPage",
+                attributes: {
+                    recordId: event.detail.row.Id,
+                    objectApiName : "SubTask__c",
+                    actionName: "edit"
+                }
+            });
+        }else if ( actionName === 'Delete') {  
+            var idList = [];
+            const recId =  event.detail.row.Id; 
+            idList.push(recId);
+            this.deleteRecords(idList);
         }
-    }
-     // view the current record details
-     viewCurrentRecord(currentRow) {
-        this.bShowModal = true;
-        this.isEditForm = false;
-        this.record = currentRow;
-    }
-
-    // closing modal box
-    closeModal() {
-        this.bShowModal = false;
-    }
-
-
-    editCurrentRecord(currentRow) {
-        // open modal box
-        this.bShowModal = true;
-        this.isEditForm = true;
-
-        // assign record id to the record edit form
-        this.currentRecordId = currentRow.Id;
-    }
-
-    // handleing record edit form submit
-    handleSubmit(event) {
-        // prevending default type sumbit of record edit form
-        event.preventDefault();
-
-        // querying the record edit form and submiting fields to form
-        this.template.querySelector('lightning-record-edit-form').submit(event.detail.fields);
-
-        // closing modal
-        this.bShowModal = false;
-
-        // showing success message
-        this.dispatchEvent(new ShowToastEvent({
-            title: 'Success!!',
-            message:' Sub Todo updated Successfully!!.',
-            variant: 'success'
-        }),);
-
-    }
-
-    // refreshing the datatable after record edit form success
-    handleSuccess() {
-        return refreshApex(this.refreshTable);
-    }
-
-    deleteSubTask(currentRow) {
-        let currentRecord = [];
-        currentRecord.push(currentRow.Id);
-        this.showLoadingSpinner = true;
-
-        // calling apex class method to delete the selected contact
-        delSelectedSubTasks({lstSubTaskIds: currentRecord})
-        .then(result => {
-            window.console.log('result ====> ' + result);
-            this.showLoadingSpinner = false;
-
-            // showing success message
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Success!!',
-                message:' Sub Todo deleted.',
-                variant: 'success'
-            }),);
-
-            // refreshing table data using refresh apex
-             return refreshApex(this.refreshTable);
-
-        })
-        .catch(error => {
-            window.console.log('Error ====> '+error);
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error!!', 
-                message: error.message, 
-                variant: 'error'
-            }),);
-        });
-    }
-
+        }
+        deleteRecords(idList){
+            console.log('To Be Deleted:'+JSON.stringify(idList));
+            deleteSubTasks({idList: idList})
+                .then(result => {
+                    console.log('Deleted');
+                    this.handleSearch();
+                });
+                return refreshApex(this.refreshTable);
+        }
+        handleRowSelection(event){
+        
+            const selectedRows = event.detail.selectedRows;
+            console.log('Selected Rows: '+JSON.stringify(selectedRows));
+            this.selectedRows = selectedRows;
+            if(this.selectedRows != undefined && this.selectedRows.length>0){
+                this.deleteSelectedButtonDisabled = false;
+            }
+            else{
+                this.deleteSelectedButtonDisabled = true;
+            }
+        }
+        deleteSelectedSubTasks(event){
+            var idList = [];
+            var selectedRows = this.selectedRows;
+            for(var x in selectedRows){
+                idList.push(selectedRows[x].Id);
+            }
+            this.deleteRecords(idList);
+        }
+    
 
 }

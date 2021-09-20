@@ -1,43 +1,31 @@
 public with sharing class TodoListController {
 
-    @AuraEnabled(Cacheable = true)
-    public static List<Task> getTasks(){
-        return [SELECT Subject, Description, Status, Priority, Due_date FROM Task ORDER BY Subject limit 10];
-    }
 
-    @AuraEnabled( cacheable = true )  
-    public static List< Task> fetchTasks( String searchKey ) {  
+
+    @AuraEnabled(cacheable=true)
+    public static List<Todo__c> getTodos ( String searchKey, String sortBy, String sortDirection) {
       
-        String strKey = '%' + searchKey + '%';  
-        List<Task> taskListRecord = new List<Task>();
-        for(Task taskObj : [SELECT   Subject, Description, Due_date, Priority, Status
-        FROM Task WHERE Subject LIKE: strKey ]){
-           taskListRecord.add(taskObj);
-        }
-        
-         if(taskListRecord.size()==null){
-            throw new AuraHandledException('No Record Found..'); 
-         }
-         
-        return taskListRecord;
-          
-    }  
-
+       String query = 'SELECT Name, Description__c, Status__c, Priority__c, Due_Date__c, Category__c,RecordType.Name, RecordTypeId FROM Todo__c ';
+       system.debug('query---'+query);
+       if ( searchKey != null && searchKey != '' ) {
+           String key = '%' + searchKey + '%';
+           query += ' WHERE Name LIKE :key';
+       }
+       if ( sortBy != null && sortDirection != null ) {
+           query += ' ORDER BY ' + sortBy + ' ' + sortDirection;
+       }
+       return Database.query( query );
+   }
 
     @AuraEnabled
-    public static void deleteTasks (List<Id> lstTaskIds){
-        try {
-            List<Task> lstTaskToDelete = new List<Task>();
-            System.debug('lstTaskIds ====> '+lstTaskIds);
-            for(Id idTask : lstTaskIds) {
-                lstTaskToDelete.add(new Task(Id = idTask));
-            }
-            if(!lstTaskToDelete.isEmpty()) {
-                delete lstTaskToDelete;
-            }
+    public static void deleteTodo (List<Id> idList){
+        List<Todo__c> todoList = new List<Todo__c>();
+        for(Id id : idList){
+            todoList.add(new Todo__c(Id = id));
         }
-        catch(Exception ex) {
-            throw new AuraHandledException(ex.getMessage());
+
+        if(!todoList.isEmpty()){
+            delete todoList;
         }
     }
 }
