@@ -12,6 +12,7 @@ import { NavigationMixin } from 'lightning/navigation';
 // importing apex class methods
 import getTodos from '@salesforce/apex/TodoListController.getTodos';
 import deleteTodo from '@salesforce/apex/TodoListController.deleteTodo';
+import { getPicklistValues } from 'lightning/uiObjectInfoApi';
 
 
 // importing to refresh the apex if any record changes the datas
@@ -21,18 +22,20 @@ const actions= [
     { label: 'Edit', name: 'edit'}, 
     { label: 'Delete', name: 'delete'}
 ]
+let DEFAULT_ACTIONS = [{ label: 'All', checked: true, name: 'all' }];
+
 const  columns = [
     { label: 'Name', fieldName: TODO_NAME.fieldApiName }, 
     { label: 'Description', fieldName: TODO_DESCRIPTION.fieldApiName, type: 'text'},
     { label: 'Due Date', fieldName: TODO_DUE_DATE.fieldApiName, type: 'date'}, 
-    { label: 'Status', fieldName: TODO_STATUS.fieldApiName,type: 'picklist'}, 
-    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist'},
-    { label: 'Category', fieldName: 'Category__c', type: 'picklist'},
-    { label: 'Record Type' , fieldName: 'RecordType.Name', actions:[
+    { label: 'Status', fieldName: TODO_STATUS.fieldApiName,type: 'picklist',actions: [
         { label: 'All', checked: true, name:'all' },
-        { label: 'Season', checked: false, name:'Season' },
-        { label: 'Position', checked: false, name:'Position' }
+        { label: 'Not Started', checked: false, name:'not Started' },
+        { label: 'In Progress', checked: false, name:'in Progress' },
+        { label: 'Completed', checked: false, name:'completed' }
     ]}, 
+    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist'},
+    { label: 'Category', fieldName: TODO_CATEGORY.fieldApiName, type: 'picklist',actions: DEFAULT_ACTIONS}, 
     {type: "button",  initialWidth: 80, typeAttributes: {  
         label: 'Edit',  
         name: 'Edit',  
@@ -83,8 +86,8 @@ export default class TodoList extends NavigationMixin (LightningElement) {
     selectedRecords = [];
     refreshTable;
     todos=[];
-    
-    
+    ALL_TODOS=[];
+    latestActions=[];
 
        // flas
     showTable = false;
@@ -104,7 +107,23 @@ export default class TodoList extends NavigationMixin (LightningElement) {
            return refreshApex(this.refreshTable);   
        }   
 
-   
+       @wire(getPicklistValues, { recordTypeId: '0125f000000Y5YIAA0' , fieldApiName: TODO_CATEGORY })
+    todoStatus({ error, data }) {
+        if (data) {
+            data.values.forEach(pl => {
+                this.latestActions.push({ label: pl.label, checked: false, name: pl.value });
+            });
+            this.columns.forEach(col => {
+                if (col.label === 'Category') {
+                    col.actions = [...col.actions, ...this.latestActions];
+                }
+            });
+            this.showTable = this.latestActions.length > 0;
+        } else if (error) {
+            console.error(error);
+        }
+    }
+    
     // retrieving the data using wire service
     @wire(getTodos, {searchKey: '$searchKey', 
                      sortBy: '$sortedBy', 
@@ -113,6 +132,7 @@ export default class TodoList extends NavigationMixin (LightningElement) {
         this.refreshTable = result;
       
         if (result.data) {
+            this.ALL_TODOS = result.data;
             this.data = result.data;
             this.error = undefined;
 
@@ -120,42 +140,21 @@ export default class TodoList extends NavigationMixin (LightningElement) {
             this.error = result.error;
             this.data = undefined;
     }}
-
-
-    handleHeaderAction (event) {
-        // Retrieves the name of the selected filter
+ 
+    handleHeaderAction(event) {
         const actionName = event.detail.action.name;
-        // Retrieves the current column definition
-        // based on the selected filter
         const colDef = event.detail.columnDefinition;
-        const columns = this.columns;
-        const activeFilter = this.activeFilter;
-    
-        if (actionName !== activeFilter) {
-            var idx = columns.indexOf(colDef);
-            // Update the column definition with the updated actions data
-            var actions = columns[idx].actions;
-            actions.forEach((action) => {
-                action.checked = action.name === actionName;
-            });
-            this.activeFilter = actionName;
-            this.updateTodos();
-            this.columns = columns;
-        }}
-    
-    updateTodos(cmp) {
-        const rows = this.rawData;
-        const activeFilter = this.activeFilter;
-        const filteredRows = rows;
-        if (activeFilter !== 'all') {
-            filteredRows = rows.filter(function (row) {
-                return (activeFilter === 'season' ||
-                  activeFilter === 'position');
-                });
-        }
-        this.data = filteredRows;
-    }
+        const cols = this.columns;
 
+        if (actionName !== undefined && actionName !== 'all') {
+            this.todos = this.ALL_TODOS.filter(todo => todo[colDef.label] === actionName);
+        } else if (actionName === 'all') {
+            this.todos = this.ALL_TODOS;
+        }
+
+        cols.find(col => col.label === colDef.label).actions.forEach(action => action.checked = action.name === actionName);
+        this.columns = [...cols];
+    }
       
     sortColumns( event ) {
         this.sortedBy = event.detail.fieldName;

@@ -19,15 +19,17 @@
                                      placeholder="Search for todos"
                                      value={searchKey}>  
                     </lightning-input> 
+                    <template if:true={showTable}>
                <lightning-datatable data={data}
                                     columns={columns}
                                     key-field="id"
-                                    hide-checkbox-column="true"
+                                    hide-checkbox-column
                                     onrowaction={callRowAction}
                                     onheaderaction={handleHeaderAction}
                                     sorted-by={sortedBy}
                                     sorted-direction={sortedDirection} onsort={sortColumns}
                 ></lightning-datatable>
+                </template>
            <template if:false={data}>
                <div class="slds-text-color_error">
                 An error occurred while loading the todo list
