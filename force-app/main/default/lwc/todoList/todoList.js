@@ -12,7 +12,7 @@ import { NavigationMixin } from 'lightning/navigation';
 // importing apex class methods
 import getTodos from '@salesforce/apex/TodoListController.getTodos';
 import deleteTodo from '@salesforce/apex/TodoListController.deleteTodo';
-import { getPicklistValues } from 'lightning/uiObjectInfoApi';
+
 
 
 // importing to refresh the apex if any record changes the datas
@@ -22,7 +22,6 @@ const actions= [
     { label: 'Edit', name: 'edit'}, 
     { label: 'Delete', name: 'delete'}
 ]
-let DEFAULT_ACTIONS = [{ label: 'All', checked: true, name: 'all' }];
 
 const  columns = [
     { label: 'Name', fieldName: TODO_NAME.fieldApiName }, 
@@ -35,7 +34,7 @@ const  columns = [
         { label: 'Completed', checked: false, name:'completed' }
     ]}, 
     { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist'},
-    { label: 'Category', fieldName: TODO_CATEGORY.fieldApiName, type: 'picklist',actions: DEFAULT_ACTIONS}, 
+    { label: 'Category', fieldName: TODO_CATEGORY.fieldApiName, type: 'picklist'}, 
     {type: "button",  initialWidth: 80, typeAttributes: {  
         label: 'Edit',  
         name: 'Edit',  
@@ -87,10 +86,7 @@ export default class TodoList extends NavigationMixin (LightningElement) {
     refreshTable;
     todos=[];
     ALL_TODOS=[];
-    latestActions=[];
-
-       // flas
-    showTable = false;
+    
     
     navigateToNewTodo() {
         this[NavigationMixin.Navigate]({
@@ -107,22 +103,6 @@ export default class TodoList extends NavigationMixin (LightningElement) {
            return refreshApex(this.refreshTable);   
        }   
 
-       @wire(getPicklistValues, { recordTypeId: '0125f000000Y5YIAA0' , fieldApiName: TODO_CATEGORY })
-    todoStatus({ error, data }) {
-        if (data) {
-            data.values.forEach(pl => {
-                this.latestActions.push({ label: pl.label, checked: false, name: pl.value });
-            });
-            this.columns.forEach(col => {
-                if (col.label === 'Category') {
-                    col.actions = [...col.actions, ...this.latestActions];
-                }
-            });
-            this.showTable = this.latestActions.length > 0;
-        } else if (error) {
-            console.error(error);
-        }
-    }
     
     // retrieving the data using wire service
     @wire(getTodos, {searchKey: '$searchKey', 
@@ -141,20 +121,6 @@ export default class TodoList extends NavigationMixin (LightningElement) {
             this.data = undefined;
     }}
  
-    handleHeaderAction(event) {
-        const actionName = event.detail.action.name;
-        const colDef = event.detail.columnDefinition;
-        const cols = this.columns;
-
-        if (actionName !== undefined && actionName !== 'all') {
-            this.todos = this.ALL_TODOS.filter(todo => todo[colDef.label] === actionName);
-        } else if (actionName === 'all') {
-            this.todos = this.ALL_TODOS;
-        }
-
-        cols.find(col => col.label === colDef.label).actions.forEach(action => action.checked = action.name === actionName);
-        this.columns = [...cols];
-    }
       
     sortColumns( event ) {
         this.sortedBy = event.detail.fieldName;
@@ -222,6 +188,21 @@ export default class TodoList extends NavigationMixin (LightningElement) {
                 idList.push(selectedRows[x].Id);
             }
             this.deleteRecords(idList);
+        }
+
+        handleHeaderAction(event) {
+            const actionName = event.detail.action.name;
+            const colDef = event.detail.columnDefinition;
+            const cols = this.columns;
+    
+            if (actionName !== undefined && actionName !== 'all') {
+                this.todos = this.ALL_TODOS.filter(todo => todo[colDef.label] === actionName);
+            } else if (actionName === 'all') {
+                this.todos = this.ALL_TODOS;
+            }
+    
+            cols.find(col => col.label === colDef.label).actions.forEach(action => action.checked = action.name === actionName);
+            this.columns = [...cols];
         }
 
     }
