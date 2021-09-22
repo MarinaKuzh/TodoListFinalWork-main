@@ -14,14 +14,10 @@ import getTodos from '@salesforce/apex/TodoListController.getTodos';
 import deleteTodo from '@salesforce/apex/TodoListController.deleteTodo';
 
 
-
 // importing to refresh the apex if any record changes the datas
 import {refreshApex} from '@salesforce/apex';
 
-const actions= [
-    { label: 'Edit', name: 'edit'}, 
-    { label: 'Delete', name: 'delete'}
-]
+
 
 const  columns = [
     { label: 'Name', fieldName: TODO_NAME.fieldApiName }, 
@@ -29,12 +25,21 @@ const  columns = [
     { label: 'Due Date', fieldName: TODO_DUE_DATE.fieldApiName, type: 'date'}, 
     { label: 'Status', fieldName: TODO_STATUS.fieldApiName,type: 'picklist',actions: [
         { label: 'All', checked: true, name:'all' },
-        { label: 'Not Started', checked: false, name:'not Started' },
-        { label: 'In Progress', checked: false, name:'in Progress' },
-        { label: 'Completed', checked: false, name:'completed' }
+        { label: 'Not Started', checked: false, name:'Not Started' },
+        { label: 'In Progress', checked: false, name:'In Progress' },
+        { label: 'Completed', checked: false, name:'Completed' }
     ]}, 
-    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist'},
-    { label: 'Category', fieldName: TODO_CATEGORY.fieldApiName, type: 'picklist'}, 
+    { label: 'Priority', fieldName: TODO_PRIORITY.fieldApiName, type: 'picklist',actions: [
+        { label: 'All', checked: true, name:'all' },
+        { label: 'High', checked: false, name:'High' },
+        { label: 'Medium', checked: false, name:'Medium' },
+        { label: 'Low', checked: false, name:'Low' }]
+    },
+    { label: 'Category', fieldName: TODO_CATEGORY.fieldApiName, type: 'picklist', actions:[
+        { label: 'All', checked: true, name:'all' },
+        { label: 'Season', checked: false, name:'Season' },
+        { label: 'Position', checked: false, name:'Position' }
+    ]}, 
     {type: "button",  initialWidth: 80, typeAttributes: {  
         label: 'Edit',  
         name: 'Edit',  
@@ -63,7 +68,7 @@ export default class TodoList extends NavigationMixin (LightningElement) {
     result;
     // reactive variable
     @track todo;
-    @track data;
+    @track data=[];
     @track columns = columns;
     @track record = [];
     @track currentRecordId;
@@ -84,9 +89,9 @@ export default class TodoList extends NavigationMixin (LightningElement) {
     todoRecordType= TODO_RECORD_TYPE;
     selectedRecords = [];
     refreshTable;
-    todos=[];
     ALL_TODOS=[];
-    
+
+   
     
     navigateToNewTodo() {
         this[NavigationMixin.Navigate]({
@@ -103,7 +108,7 @@ export default class TodoList extends NavigationMixin (LightningElement) {
            return refreshApex(this.refreshTable);   
        }   
 
-    
+
     // retrieving the data using wire service
     @wire(getTodos, {searchKey: '$searchKey', 
                      sortBy: '$sortedBy', 
@@ -188,7 +193,10 @@ export default class TodoList extends NavigationMixin (LightningElement) {
                 idList.push(selectedRows[x].Id);
             }
             this.deleteRecords(idList);
+            return refreshApex(this.refreshTable);
         }
+
+      
 
         handleHeaderAction(event) {
             const actionName = event.detail.action.name;
@@ -196,9 +204,9 @@ export default class TodoList extends NavigationMixin (LightningElement) {
             const cols = this.columns;
     
             if (actionName !== undefined && actionName !== 'all') {
-                this.todos = this.ALL_TODOS.filter(todo => todo[colDef.label] === actionName);
+                this.data = this.ALL_TODOS.filter(_data => _data[colDef.label] === actionName);
             } else if (actionName === 'all') {
-                this.todos = this.ALL_TODOS;
+                this.data = this.ALL_TODOS;
             }
     
             cols.find(col => col.label === colDef.label).actions.forEach(action => action.checked = action.name === actionName);
